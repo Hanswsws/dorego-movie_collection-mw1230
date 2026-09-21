@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Movie Collection</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 40px 16px;
+    }
+
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 24px 28px 32px;
+      border-radius: 8px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-top: 0;
+    }
+
+    h2 {
+      margin-bottom: 12px;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    input {
+      flex: 1 1 140px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 8px 14px;
+      border: 1px solid #aaa;
+      background: #efefef;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #e2e2e2;
+    }
+
+    #message {
+      font-weight: bold;
+      font-size: 14px;
+      margin: 12px 0;
+      min-height: 18px;
+    }
+
+    #message.error {
+      color: #b00020;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Movie Collection</h1>
+
+    <h2>Add Movie</h2>
+    <form id="movie-form">
+      <input type="text" id="title" placeholder="Title" />
+      <input type="text" id="genre" placeholder="Genre" />
+      <input type="number" id="year" placeholder="Year" />
+      <button type="submit">Add Movie</button>
+    </form>
+    <p id="message"></p>
+
+    <h2>Movies</h2>
+    <button id="load-btn" type="button">Load Movies</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Title</th>
+          <th>Genre</th>
+          <th>Year</th>
+        </tr>
+      </thead>
+      <tbody id="movie-list"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API_URL = "/api/movies";
+
+    const form = document.getElementById("movie-form");
+    const message = document.getElementById("message");
+    const movieList = document.getElementById("movie-list");
+
+    function showMessage(text, isError = false) {
+      message.textContent = text;
+      message.className = isError ? "error" : "";
+    }
+
+    // Fetch all movies and draw them in the table
+    async function loadMovies() {
+      try {
+        const res = await fetch(API_URL);
+        const movies = await res.json();
+
+        movieList.innerHTML = "";
+        movies.forEach((movie) => {
+          const row = document.createElement("tr");
+          [movie.id, movie.title, movie.genre, movie.year].forEach((value) => {
+            const cell = document.createElement("td");
+            cell.textContent = value; // textContent avoids injecting HTML
+            row.appendChild(cell);
+          });
+          movieList.appendChild(row);
+        });
+      } catch (err) {
+        showMessage("Could not load movies. Is the server running?", true);
+      }
+    }
+
+    // Send the form data to the API, then refresh the list
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const movie = {
+        title: document.getElementById("title").value,
+        genre: document.getElementById("genre").value,
+        year: document.getElementById("year").value,
+      };
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(movie),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showMessage(data.error, true);
+          return;
+        }
+
+        showMessage("Movie added successfully");
+        form.reset();
+        loadMovies(); // refresh the list after adding
+      } catch (err) {
+        showMessage("Could not add movie. Is the server running?", true);
+      }
+    });
+
+    document.getElementById("load-btn").addEventListener("click", loadMovies);
+
+    // Show the list as soon as the page opens
+    loadMovies();
+  </script>
+</body>
+</html>
