@@ -1,74 +1,166 @@
 const express = require("express");
+const mysql = require("mysql2");
 const path = require("path");
 
 const app = express();
 const PORT = 3000;
 
-// Parse JSON request bodies
+/*
+
+npm init -y
+npm install express mysql2
+
+*/
+
+// Allow JSON data
 app.use(express.json());
 
-// Serve index.html (and anything else) from the /public folder
+
+// Serve index.html (from the public folder)
 app.use(express.static(path.join(__dirname, "public")));
 
-// Temporary storage: a plain JavaScript array.
-// Everything here disappears when the server restarts.
-let movies = [
-  { id: 1, title: "Interstellar", genre: "Science Fiction", year: 2014 },
-  { id: 2, title: "Avengers: Endgame", genre: "Action", year: 2019 },
-  { id: 3, title: "Coco", genre: "Animation", year: 2017 },
-];
-let nextId = 4;
 
-// GET /api/movies - retrieve all movies
+// Connect to MySQL
+const db = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "",
+    database: "movie_db"
+});
+
+
+// Test database connection
+db.connect((err) => {
+
+    if (err) {
+        console.error("Database connection failed:", err);
+        return;
+    }
+
+    console.log("Connected to MySQL");
+
+});
+
+
+// ========================================
+// GET - Retrieve all movies
+// ========================================
+
 app.get("/api/movies", (req, res) => {
-  res.json(movies);
+
+    const sql = "SELECT * FROM movies";
+
+    db.query(sql, (err, results) => {
+
+        if (err) {
+            return res.status(500).json({
+                error: "Database error"
+            });
+        }
+
+        res.json(results);
+
+    });
+
 });
 
-// GET /api/movies/:id - retrieve one movie
+
+// ========================================
+// GET - Retrieve one movie
+// ========================================
+
 app.get("/api/movies/:id", (req, res) => {
-  const id = Number(req.params.id);
-  const movie = movies.find((m) => m.id === id);
 
-  if (!movie) {
-    return res.status(404).json({ error: `Movie with id ${req.params.id} not found` });
-  }
+    const sql = "SELECT * FROM movies WHERE id = ?";
 
-  res.json(movie);
+    db.query(sql, [req.params.id], (err, results) => {
+
+        if (err) {
+            return res.status(500).json({
+                error: "Database error"
+            });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({
+                error: `Movie with id ${req.params.id} not found`
+            });
+        }
+
+        res.json(results[0]);
+
+    });
+
 });
 
-// POST /api/movies - add a new movie
+
+// ========================================
+// POST - Insert a movie
+// ========================================
+
 app.post("/api/movies", (req, res) => {
-  const { title, genre, year } = req.body || {};
 
-  // Return an error if required fields are missing
-  const missing = [];
-  if (!title || !String(title).trim()) missing.push("title");
-  if (!genre || !String(genre).trim()) missing.push("genre");
-  if (year === undefined || year === null || String(year).trim() === "") missing.push("year");
+    const { title, genre, year } = req.body || {};
 
-  if (missing.length > 0) {
-    return res
-      .status(400)
-      .json({ error: `Missing required field(s): ${missing.join(", ")}` });
-  }
 
-  const yearNumber = Number(year);
-  if (!Number.isInteger(yearNumber)) {
-    return res.status(400).json({ error: "year must be a whole number" });
-  }
+    // Return an error if required fields are missing
+    const missing = [];
+    if (!title || !String(title).trim()) missing.push("title");
+    if (!genre || !String(genre).trim()) missing.push("genre");
+    if (year === undefined || year === null || String(year).trim() === "") missing.push("year");
 
-  // id is assigned automatically
-  const newMovie = {
-    id: nextId++,
-    title: String(title).trim(),
-    genre: String(genre).trim(),
-    year: yearNumber,
-  };
+    if (missing.length > 0) {
+        return res.status(400).json({
+            error: `Missing required field(s): ${missing.join(", ")}`
+        });
+    }
 
-  movies.push(newMovie);
-  res.status(201).json(newMovie);
+    const yearNumber = Number(year);
+    if (!Number.isInteger(yearNumber)) {
+        return res.status(400).json({
+            error: "year must be a whole number"
+        });
+    }
+
+
+    const sql = `
+        INSERT INTO movies
+        (title, genre, year)
+        VALUES (?, ?, ?)
+    `;
+
+    const values = [String(title).trim(), String(genre).trim(), yearNumber];
+
+
+    db.query(sql, values, (err, result) => {
+
+        if (err) {
+            return res.status(500).json({
+                error: "Database error"
+            });
+        }
+
+        // The id is created automatically by MySQL (AUTO_INCREMENT)
+        res.status(201).json({
+            id: result.insertId,
+            title: values[0],
+            genre: values[1],
+            year: values[2]
+        });
+
+    });
+
 });
+
+
+// ========================================
+// Start Server
+// ========================================
 
 app.listen(PORT, () => {
-  console.log(`Movie API running at http://localhost:${PORT}`);
+
+    console.log(
+        `Movie API running at http://localhost:${PORT}`
+    );
+
 });
